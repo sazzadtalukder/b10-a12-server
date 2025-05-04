@@ -161,6 +161,39 @@ async function run() {
             res.send(result);
             
         })
+        app.patch('/tasksIncrement', async(req,res)=>{
+            const info = req.body;
+            const coin = info.totalPayableCoin
+            const email = req.query.email;
+            const query = {email: email};
+            
+            const updatedDoc = {
+                $inc : {coin: +coin}
+            }
+            const result = await userCollection.updateOne(query,updatedDoc)
+            res.send(result)
+
+        })
+        app.get('/tasks/:id',verifyToken,async(req,res)=>{
+            const id = req.params.id;
+            const filter = {_id: new ObjectId(id)};
+            const singleTaskInfo = await taskCollection.findOne(filter);
+            res.send(singleTaskInfo)
+        })
+        app.get('/tasks', verifyToken,async(req,res)=>{
+            const email = req.query.email;
+            let query = {}
+            if(email)
+                query = {email: email}
+            const result = await taskCollection.find(query).toArray()
+            res.send(result);
+        })
+        app.delete('/tasks/:id', verifyToken,async(req,res)=>{
+            const id = req.params.id;
+            const filter = {_id : new ObjectId(id)}
+            const result = await taskCollection.deleteOne(filter)
+            res.send(result)
+        })
         // Connect the client to the server	(optional starting in v4.7)
         // await client.connect();
         // Send a ping to confirm a successful connection
