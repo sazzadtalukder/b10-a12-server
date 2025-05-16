@@ -3,7 +3,7 @@ const cors = require('cors');
 const jwt = require('jsonwebtoken');
 const app = express();
 require('dotenv').config()
-
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 app.use(cors())
 app.use(express.json())
 
@@ -23,104 +23,145 @@ const client = new MongoClient(uri, {
 
 const userCollection = client.db("microDb").collection("users");
 const taskCollection = client.db("microDb").collection("tasks");
+const paymentCollection = client.db("microDb").collection("payments");
+const submittedTaskCollection = client.db("microDb").collection("submittedTask");
+const withRequestCollection = client.db("microDb").collection("withdrawRequest");
 
 async function run() {
     try {
-        const verifyToken = (req,res,next)=>{
+        const verifyToken = (req, res, next) => {
             // console.log('inside Verify Token coming from interceptor',req.headers.authorization)
-            if(!req.headers.authorization){
-                return res.status(401).send({message: 'UnAuthorized access'})
+            if (!req.headers.authorization) {
+                return res.status(401).send({ message: 'UnAuthorized access' })
             }
             const token = req.headers.authorization.split(' ')[1];
-            jwt.verify(token,process.env.JWT_SECRET_KEY, (err,decoded)=>{
-                  if(err){
-                    return res.status(401).send({message: 'UnAuthorized access'})
-                  } 
-                  req.decoded = decoded;
+            jwt.verify(token, process.env.JWT_SECRET_KEY, (err, decoded) => {
+                if (err) {
+                    return res.status(401).send({ message: 'UnAuthorized access' })
+                }
+                req.decoded = decoded;
                 //   console.log(req.decoded)
-                  next();
-            } )
+                next();
+            })
             // 
         }
         // use verifyAdmin after verifyToken
-        const verifyAdmin = async(req,res,next)=>{
+        const verifyAdmin = async (req, res, next) => {
             const email = req.decoded.email;
-            const query = {email: email}
+            const query = { email: email }
             const user = await userCollection.findOne(query)
             const isAdmin = user?.role === 'admin'
-            if(!isAdmin)
-                return res.status(403).send({message: 'Forbidden access'})
+            if (!isAdmin)
+                return res.status(403).send({ message: 'Forbidden access' })
             next()
         }
-        const verifyBuyer = async(req,res,next)=>{
+        const verifyBuyer = async (req, res, next) => {
             const email = req.decoded.email;
-            const query = {email: email}
+            const query = { email: email }
             const user = await userCollection.findOne(query)
             const isBuyer = user?.role === 'buyer'
-            if(!isBuyer)
-                return res.status(403).send({message: 'Forbidden access'})
+            if (!isBuyer)
+                return res.status(403).send({ message: 'Forbidden access' })
             next()
         }
-        const verifyWorker = async(req,res,next)=>{
+        const verifyWorker = async (req, res, next) => {
             const email = req.decoded.email;
-            const query = {email: email}
+            const query = { email: email }
             const user = await userCollection.findOne(query)
             const isWorker = user?.role === 'worker'
-            if(!isWorker)
-                return res.status(403).send({message: 'Forbidden access'})
+            if (!isWorker)
+                return res.status(403).send({ message: 'Forbidden access' })
             next()
         }
-        app.post('/jwt', async(req,res)=>{
+        // payment intent 
+        app.post('/create-payment-intent', async (req, res) => {
+            const { price } = req.body;
+            const amount = parseInt(price * 100);
+            const paymentIntent = await stripe.paymentIntents.create({
+                amount: amount,
+                currency: 'usd',
+                payment_method_types: ['card']
+
+            })
+            res.send({
+                clientSecret: paymentIntent.client_secret
+            })
+
+
+        })
+        app.post('/payments', async (req, res) => {
+            const payment = req.body;
+            const value = payment.price * 10 // if payment.price are 2 then coin will be 20 , coin = dollar * 10
+            const paymentResult = await paymentCollection.insertOne(payment)
+            const email = req.query.email;
+            const query = { email: email }
+
+            const updatedDoc = {
+                $inc: {
+                    coin: +value
+                }
+            }
+            const deleteResult = await userCollection.updateOne(query, updatedDoc)
+            res.send({ paymentResult, deleteResult })
+        })
+        app.get('/purchaseInfo', async (req,res)=>{
+            const email = req.query.email;
+            const filter = {email : email}
+            const result = await  paymentCollection.find(filter).toArray();
+            res.send(result)
+            // console.log(result)
+        })
+        app.post('/jwt', async (req, res) => {
             const user = req.body;
-            const token = jwt.sign(user,process.env.JWT_SECRET_KEY,{expiresIn: '1h'})
-            res.send({token})
+            const token = jwt.sign(user, process.env.JWT_SECRET_KEY, { expiresIn: '1h' })
+            res.send({ token })
         })
         // for admin 
-        app.get('/user/admin/:email',verifyToken,async(req,res)=>{
+        app.get('/user/admin/:email', verifyToken, async (req, res) => {
             const email = req.params.email;
-            if(email!= req.decoded.email){
-                res.status(403).send({message: "Forbidden Access"})
+            if (email != req.decoded.email) {
+                res.status(403).send({ message: "Forbidden Access" })
             }
-            const query= {email: email}
+            const query = { email: email }
             const user = await userCollection.findOne(query);
             let admin = false;
-            if(user){
+            if (user) {
                 admin = user?.role == 'admin'
             }
-            res.send({admin})
+            res.send({ admin })
         })
         // for buyer 
-        app.get('/user/buyer/:email',verifyToken,async(req,res)=>{
+        app.get('/user/buyer/:email', verifyToken, async (req, res) => {
             const email = req.params.email;
-            if(email!= req.decoded.email){
-                res.status(403).send({message: "Forbidden Access"})
+            if (email != req.decoded.email) {
+                res.status(403).send({ message: "Forbidden Access" })
             }
-            const query= {email: email}
+            const query = { email: email }
             const user = await userCollection.findOne(query);
             let buyer = false;
-            if(user){
+            if (user) {
                 buyer = user?.role == 'buyer'
             }
-            res.send({buyer})
+            res.send({ buyer })
         })
         // ----
-         // for worker 
-         app.get('/user/worker/:email',verifyToken,async(req,res)=>{
+        // for worker 
+        app.get('/user/worker/:email', verifyToken, async (req, res) => {
             const email = req.params.email;
-            if(email!= req.decoded.email){
-                res.status(403).send({message: "Forbidden Access"})
+            if (email != req.decoded.email) {
+                res.status(403).send({ message: "Forbidden Access" })
             }
-            const query= {email: email}
+            const query = { email: email }
             const user = await userCollection.findOne(query);
             let worker = false;
-            if(user){
+            if (user) {
                 worker = user?.role == 'worker'
             }
-            res.send({worker})
+            res.send({ worker })
         })
         // ----
         app.post('/users', async (req, res) => {
-            
+
             const userInfo = req.body;
             const query = { email: userInfo.email }
             const existingUser = await userCollection.findOne(query)
@@ -130,70 +171,302 @@ async function run() {
             const result = await userCollection.insertOne(userInfo)
             res.send(result)
         })
-        app.get('/users',verifyToken, async(req,res)=>{
+        app.get('/users', verifyToken, async (req, res) => {
             // console.log(req.headers)
             const email = req.query.email;
-            const filter = { email: email}
+            const filter = { email: email }
             const result = await userCollection.findOne(filter);
             res.send(result);
         })
-    //    task related api 
-        app.post('/tasks',verifyToken,async(req,res)=>{
-            const taskInfo = req.body;
-            const result = await taskCollection.insertOne(taskInfo)
+        app.get('/totalUser',verifyToken,async (req,res)=>{
+            const result = await userCollection.find().toArray();
+            res.send(result);
+        })
+        app.get('/totalWorker',verifyToken,async (req,res)=>{
+            const filter = {role : 'worker'}
+            const result = await userCollection.find(filter).toArray();
+            res.send(result);
+        })
+        app.get('/totalBuyer',verifyToken,async (req,res)=>{
+            const filter = {role : 'buyer'}
+            const result = await userCollection.find(filter).toArray();
+            res.send(result);
+        })
+        app.get('/totalAmount',verifyToken,async (req,res)=>{
+            
+            const result = await paymentCollection.find().toArray();
+            res.send(result);
+        })
+        app.get('/totalRequest',verifyToken,async (req,res)=>{
+            
+            const result = await withRequestCollection.find().toArray();
+            res.send(result);
+        })
+        app.get('/totalRequest/:id',verifyToken,async (req,res)=>{
+            const id  = req.params.id;
+            const filter = {_id : new ObjectId(id)}
+            const result = await withRequestCollection.findOne(filter)
+            res.send(result);
+        })
+        
+        app.patch('/updateApprove/:id', verifyToken, async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: new ObjectId(id) }
+            const updateDoc = {
+                $set: { status: 'approve' }
+            }
+            const result = await withRequestCollection.updateOne(
+                query,
+                updateDoc
+            )
+            res.send(result);
+
+        })
+        app.patch('/decreaseCoin', verifyToken, async (req, res) => {
+            const info = req.body
+
+            const query = { email : info?.worker_email }
+            const updateDoc = {
+                $inc : { coin : -info?. payable_amount }
+            }
+            const result = await userCollection.updateOne(
+                query,
+                updateDoc
+            )
+            console.log('update hoise worker ',result)
+            res.send(result);
+
+        })
+        
+        app.delete('/totalUser/:id', verifyToken, async (req, res) => {
+            const id = req.params.id;
+            const filter = { _id: new ObjectId(id) }
+            const result = await userCollection.deleteOne(filter)
+            console.log('delete er result',result)
             res.send(result)
         })
-        app.patch('/tasks',verifyToken,async(req,res)=>{
-            const coinAmount = req.body;
-            console.log(coinAmount)
-            const coin  = coinAmount.totalPayableAmount
-            const email = req.query.email;
-            const query ={email: email}
-            
-            const user = await userCollection.findOne(query);
+        app.patch('/updateRole/:id', verifyToken, async (req, res) => {
+            const info = req.body
+            const id = req.params.id;
+            const query = { _id: new ObjectId(id) }
             const updateDoc = {
-                $inc : {coin: -coin}
+                $set: { role: info?.role }
             }
             const result = await userCollection.updateOne(
                 query,
                 updateDoc
             )
             res.send(result);
-            
+
         })
-        app.patch('/tasksIncrement', async(req,res)=>{
-            const info = req.body;
-            const coin = info.totalPayableCoin
+        
+        // //    task related api 
+        app.get('/submittedTask', verifyToken, async (req, res) => {
             const email = req.query.email;
-            const query = {email: email};
-            
-            const updatedDoc = {
-                $inc : {coin: +coin}
+
+            const filter = {
+                Buyer_email: email,
+                status: 'pending'
             }
-            const result = await userCollection.updateOne(query,updatedDoc)
+            const result = await submittedTaskCollection.find(filter).toArray();
             res.send(result)
 
         })
-        app.get('/tasks/:id',verifyToken,async(req,res)=>{
+        app.get('/submittedTask/:id', verifyToken, async (req, res) => {
             const id = req.params.id;
-            const filter = {_id: new ObjectId(id)};
+            const filter = { _id: new ObjectId(id) }
+            const result = await submittedTaskCollection.findOne(filter)
+            res.send(result)
+        })
+        app.patch('/submittedTask/:id', verifyToken, async (req, res) => {
+            const statusType = req.body;
+            console.log(statusType)
+            const status = statusType.status
+            const id = req.params.id;
+            const query = { _id: new ObjectId(id) }
+            const updateDoc = {
+                $set: { status: status }
+            }
+            const result = await submittedTaskCollection.updateOne(
+                query,
+                updateDoc
+            )
+            res.send(result);
+
+        })
+
+        
+        app.patch('/updateWorker/:id', verifyToken, async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: new ObjectId(id) }
+            const updateDoc = {
+                $inc : { required_workers : +1 }
+            }
+            const result = await taskCollection.updateOne(
+                query,
+                updateDoc
+            )
+            console.log('update hoise worker ',result)
+            res.send(result);
+
+        })
+        
+// worker_email --> submitted db
+// email --> users db
+
+
+        app.patch('/updateCoin', verifyToken, async (req, res) => {
+            const info = req.body
+
+            const query = { email : info?.worker_email }
+            const updateDoc = {
+                $inc : { coin : +info?. payable_amount }
+            }
+            const result = await userCollection.updateOne(
+                query,
+                updateDoc
+            )
+            console.log('update hoise worker ',result)
+            res.send(result);
+
+        })
+        app.patch('/updateStatus/:id', verifyToken, async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: new ObjectId(id) }
+            const updateDoc = {
+                $set: { status: 'approve' }
+            }
+            const result = await submittedTaskCollection.updateOne(
+                query,
+                updateDoc
+            )
+            res.send(result);
+
+        })
+        app.post('/tasks', verifyToken, async (req, res) => {
+            const taskInfo = req.body;
+            const result = await taskCollection.insertOne(taskInfo)
+            res.send(result)
+        })
+        app.patch('/tasks', verifyToken, async (req, res) => {
+            const coinAmount = req.body;
+            console.log(coinAmount)
+            const coin = coinAmount.totalPayableAmount
+            const email = req.query.email;
+            const query = { email: email }
+
+            const user = await userCollection.findOne(query);
+            const updateDoc = {
+                $inc: { coin: -coin }
+            }
+            const result = await userCollection.updateOne(
+                query,
+                updateDoc
+            )
+            res.send(result);
+
+        })
+        app.patch('/tasksIncrement', async (req, res) => {
+            const info = req.body;
+            const coin = info.totalPayableCoin
+            const email = req.query.email;
+            const query = { email: email };
+
+            const updatedDoc = {
+                $inc: { coin: +coin }
+            }
+            const result = await userCollection.updateOne(query, updatedDoc)
+            res.send(result)
+
+        })
+        app.get('/tasks/:id', verifyToken, async (req, res) => {
+            const id = req.params.id;
+            const filter = { _id: new ObjectId(id) };
             const singleTaskInfo = await taskCollection.findOne(filter);
             res.send(singleTaskInfo)
         })
-        app.get('/tasks', verifyToken,async(req,res)=>{
+        app.get('/tasks', verifyToken, async (req, res) => {
             const email = req.query.email;
             let query = {}
-            if(email)
-                query = {email: email}
+            if (email)
+                query = { email: email }
             const result = await taskCollection.find(query).toArray()
             res.send(result);
         })
-        app.delete('/tasks/:id', verifyToken,async(req,res)=>{
+        app.delete('/tasks/:id', verifyToken, async (req, res) => {
             const id = req.params.id;
-            const filter = {_id : new ObjectId(id)}
+            const filter = { _id: new ObjectId(id) }
             const result = await taskCollection.deleteOne(filter)
             res.send(result)
         })
+        app.get('/totalTask', verifyToken, async (req, res) => {
+           
+            const result = await taskCollection.find().toArray()
+            res.send(result)
+        })
+        // for worker api 
+        app.get('/tasksGreater', verifyToken, async (req, res) => {
+
+            let query = { required_workers: { $gt: 0 } }
+            const result = await taskCollection.find(query).toArray()
+
+            // console.log(result)
+            res.send(result);
+        })
+        app.get('/taskDetails/:id', verifyToken, async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: new ObjectId(id) }
+            const result = await taskCollection.findOne(query)
+            console.log(result)
+            res.send(result)
+        })
+
+        app.post('/taskSubmitted', verifyToken, async (req, res) => {
+            const submittedInfo = req.body;
+            const result = await submittedTaskCollection.insertOne(submittedInfo)
+            res.send(result)
+        })
+        app.get('/submittedInfo', verifyToken, async (req, res) => {
+            const email = req.query.email;
+
+            const query = { worker_email: email }
+            const result = await submittedTaskCollection.find(query).toArray()
+            res.send(result);
+        })
+        app.get('/pendingInfo', verifyToken, async (req, res) => {
+            const email = req.query.email;
+
+            const query = { worker_email: email , status: 'pending'}
+            const result = await submittedTaskCollection.find(query).toArray()
+            res.send(result);
+        })
+        app.get('/approveInfo', verifyToken, async (req, res) => {
+            const email = req.query.email;
+
+            const query = { worker_email: email , status: 'approve'}
+            const result = await submittedTaskCollection.find(query).toArray()
+            res.send(result);
+        })
+        // withRequestCollection
+        app.post('/withdrawRequest', async (req, res) => {
+            const info = req.body;
+            const result = await withRequestCollection.insertOne(info)
+            res.send(result)
+        })
+        app.patch('/withdrawRequest', async (req, res) => {
+            const info = req.body;
+            const coin = info.coin;
+            const email = req.query.email;
+            const query = { email: email };
+
+            const updatedDoc = {
+                $inc: { coin: -coin }
+            }
+            const result = await userCollection.updateOne(query, updatedDoc)
+            res.send(result)
+
+        })
+
         // Connect the client to the server	(optional starting in v4.7)
         // await client.connect();
         // Send a ping to confirm a successful connection
