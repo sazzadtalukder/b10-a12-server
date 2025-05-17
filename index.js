@@ -5,6 +5,11 @@ const app = express();
 require('dotenv').config()
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 app.use(cors())
+// app.use(cors({
+//     origin: ['https://b10a12-64e3d.web.app','http://localhost:5173'],
+//     credentials: true // if you're using cookies or authentication headers
+//   }));
+
 app.use(express.json())
 
 const port = process.env.PORT || 5000;
@@ -117,7 +122,7 @@ async function run() {
             res.send({ token })
         })
         // for admin 
-        app.get('/user/admin/:email', verifyToken, async (req, res) => {
+        app.get('/user/admin/:email', async (req, res) => {
             const email = req.params.email;
             if (email != req.decoded.email) {
                 res.status(403).send({ message: "Forbidden Access" })
@@ -130,8 +135,10 @@ async function run() {
             }
             res.send({ admin })
         })
+        
+      
         // for buyer 
-        app.get('/user/buyer/:email', verifyToken, async (req, res) => {
+        app.get('/user/buyer/:email', async (req, res) => {
             const email = req.params.email;
             if (email != req.decoded.email) {
                 res.status(403).send({ message: "Forbidden Access" })
@@ -146,7 +153,8 @@ async function run() {
         })
         // ----
         // for worker 
-        app.get('/user/worker/:email', verifyToken, async (req, res) => {
+        app.get('/user/worker/:email', 
+             async (req, res) => {
             const email = req.params.email;
             if (email != req.decoded.email) {
                 res.status(403).send({ message: "Forbidden Access" })
@@ -171,45 +179,46 @@ async function run() {
             const result = await userCollection.insertOne(userInfo)
             res.send(result)
         })
-        app.get('/users', verifyToken, async (req, res) => {
+        app.get('/users',  async (req, res) => {
             // console.log(req.headers)
             const email = req.query.email;
             const filter = { email: email }
             const result = await userCollection.findOne(filter);
             res.send(result);
         })
-        app.get('/totalUser',verifyToken,async (req,res)=>{
+        app.get('/totalUser',async (req,res)=>{
+            
             const result = await userCollection.find().toArray();
             res.send(result);
         })
-        app.get('/totalWorker',verifyToken,async (req,res)=>{
+        app.get('/totalWorker',async (req,res)=>{
             const filter = {role : 'worker'}
             const result = await userCollection.find(filter).toArray();
             res.send(result);
         })
-        app.get('/totalBuyer',verifyToken,async (req,res)=>{
+        app.get('/totalBuyer',async (req,res)=>{
             const filter = {role : 'buyer'}
             const result = await userCollection.find(filter).toArray();
             res.send(result);
         })
-        app.get('/totalAmount',verifyToken,async (req,res)=>{
+        app.get('/totalAmount',async (req,res)=>{
             
             const result = await paymentCollection.find().toArray();
             res.send(result);
         })
-        app.get('/totalRequest',verifyToken,async (req,res)=>{
+        app.get('/totalRequest',async (req,res)=>{
             
             const result = await withRequestCollection.find().toArray();
             res.send(result);
         })
-        app.get('/totalRequest/:id',verifyToken,async (req,res)=>{
+        app.get('/totalRequest/:id',async (req,res)=>{
             const id  = req.params.id;
             const filter = {_id : new ObjectId(id)}
             const result = await withRequestCollection.findOne(filter)
             res.send(result);
         })
         
-        app.patch('/updateApprove/:id', verifyToken, async (req, res) => {
+        app.patch('/updateApprove/:id',  async (req, res) => {
             const id = req.params.id;
             const query = { _id: new ObjectId(id) }
             const updateDoc = {
@@ -222,7 +231,7 @@ async function run() {
             res.send(result);
 
         })
-        app.patch('/decreaseCoin', verifyToken, async (req, res) => {
+        app.patch('/decreaseCoin',  async (req, res) => {
             const info = req.body
 
             const query = { email : info?.worker_email }
@@ -238,14 +247,14 @@ async function run() {
 
         })
         
-        app.delete('/totalUser/:id', verifyToken, async (req, res) => {
+        app.delete('/totalUser/:id',  async (req, res) => {
             const id = req.params.id;
             const filter = { _id: new ObjectId(id) }
             const result = await userCollection.deleteOne(filter)
             console.log('delete er result',result)
             res.send(result)
         })
-        app.patch('/updateRole/:id', verifyToken, async (req, res) => {
+        app.patch('/updateRole/:id',  async (req, res) => {
             const info = req.body
             const id = req.params.id;
             const query = { _id: new ObjectId(id) }
@@ -261,7 +270,7 @@ async function run() {
         })
         
         // //    task related api 
-        app.get('/submittedTask', verifyToken, async (req, res) => {
+        app.get('/submittedTask',  async (req, res) => {
             const email = req.query.email;
 
             const filter = {
@@ -272,13 +281,14 @@ async function run() {
             res.send(result)
 
         })
-        app.get('/submittedTask/:id', verifyToken, async (req, res) => {
+        app.get('/submittedTask/:id',  async (req, res) => {
             const id = req.params.id;
             const filter = { _id: new ObjectId(id) }
             const result = await submittedTaskCollection.findOne(filter)
             res.send(result)
         })
-        app.patch('/submittedTask/:id', verifyToken, async (req, res) => {
+        app.patch('/submittedTask/:id', 
+             async (req, res) => {
             const statusType = req.body;
             console.log(statusType)
             const status = statusType.status
@@ -296,7 +306,7 @@ async function run() {
         })
 
         
-        app.patch('/updateWorker/:id', verifyToken, async (req, res) => {
+        app.patch('/updateWorker/:id', async (req, res) => {
             const id = req.params.id;
             const query = { _id: new ObjectId(id) }
             const updateDoc = {
@@ -315,7 +325,7 @@ async function run() {
 // email --> users db
 
 
-        app.patch('/updateCoin', verifyToken, async (req, res) => {
+        app.patch('/updateCoin', async (req, res) => {
             const info = req.body
 
             const query = { email : info?.worker_email }
@@ -330,7 +340,7 @@ async function run() {
             res.send(result);
 
         })
-        app.patch('/updateStatus/:id', verifyToken, async (req, res) => {
+        app.patch('/updateStatus/:id',  async (req, res) => {
             const id = req.params.id;
             const query = { _id: new ObjectId(id) }
             const updateDoc = {
@@ -343,12 +353,12 @@ async function run() {
             res.send(result);
 
         })
-        app.post('/tasks', verifyToken, async (req, res) => {
+        app.post('/tasks', async (req, res) => {
             const taskInfo = req.body;
             const result = await taskCollection.insertOne(taskInfo)
             res.send(result)
         })
-        app.patch('/tasks', verifyToken, async (req, res) => {
+        app.patch('/tasks',  async (req, res) => {
             const coinAmount = req.body;
             console.log(coinAmount)
             const coin = coinAmount.totalPayableAmount
@@ -379,13 +389,13 @@ async function run() {
             res.send(result)
 
         })
-        app.get('/tasks/:id', verifyToken, async (req, res) => {
+        app.get('/tasks/:id',  async (req, res) => {
             const id = req.params.id;
             const filter = { _id: new ObjectId(id) };
             const singleTaskInfo = await taskCollection.findOne(filter);
             res.send(singleTaskInfo)
         })
-        app.get('/tasks', verifyToken, async (req, res) => {
+        app.get('/tasks',  async (req, res) => {
             const email = req.query.email;
             let query = {}
             if (email)
@@ -393,19 +403,19 @@ async function run() {
             const result = await taskCollection.find(query).toArray()
             res.send(result);
         })
-        app.delete('/tasks/:id', verifyToken, async (req, res) => {
+        app.delete('/tasks/:id',  async (req, res) => {
             const id = req.params.id;
             const filter = { _id: new ObjectId(id) }
             const result = await taskCollection.deleteOne(filter)
             res.send(result)
         })
-        app.get('/totalTask', verifyToken, async (req, res) => {
+        app.get('/totalTask',  async (req, res) => {
            
             const result = await taskCollection.find().toArray()
             res.send(result)
         })
         // for worker api 
-        app.get('/tasksGreater', verifyToken, async (req, res) => {
+        app.get('/tasksGreater',  async (req, res) => {
 
             let query = { required_workers: { $gt: 0 } }
             const result = await taskCollection.find(query).toArray()
@@ -413,7 +423,7 @@ async function run() {
             // console.log(result)
             res.send(result);
         })
-        app.get('/taskDetails/:id', verifyToken, async (req, res) => {
+        app.get('/taskDetails/:id',  async (req, res) => {
             const id = req.params.id;
             const query = { _id: new ObjectId(id) }
             const result = await taskCollection.findOne(query)
@@ -421,26 +431,26 @@ async function run() {
             res.send(result)
         })
 
-        app.post('/taskSubmitted', verifyToken, async (req, res) => {
+        app.post('/taskSubmitted', async (req, res) => {
             const submittedInfo = req.body;
             const result = await submittedTaskCollection.insertOne(submittedInfo)
             res.send(result)
         })
-        app.get('/submittedInfo', verifyToken, async (req, res) => {
+        app.get('/submittedInfo',  async (req, res) => {
             const email = req.query.email;
 
             const query = { worker_email: email }
             const result = await submittedTaskCollection.find(query).toArray()
             res.send(result);
         })
-        app.get('/pendingInfo', verifyToken, async (req, res) => {
+        app.get('/pendingInfo',  async (req, res) => {
             const email = req.query.email;
 
             const query = { worker_email: email , status: 'pending'}
             const result = await submittedTaskCollection.find(query).toArray()
             res.send(result);
         })
-        app.get('/approveInfo', verifyToken, async (req, res) => {
+        app.get('/approveInfo', async (req, res) => {
             const email = req.query.email;
 
             const query = { worker_email: email , status: 'approve'}
