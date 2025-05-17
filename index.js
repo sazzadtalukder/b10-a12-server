@@ -376,6 +376,18 @@ async function run() {
             res.send(result);
 
         })
+       
+        app.patch('/taskUpdate/:id',  async (req, res) => {
+            const taskItem = req.body;
+            const id = req.params.id;
+            console.log(id)
+            const query = {_id : new ObjectId(id)}
+            const updateDoc = {
+                $set: { task_title: taskItem?.task_title , task_detail: taskItem?.task_detail,submission_info: taskItem?.submission_info}
+            }
+            const result = await taskCollection.updateOne(query,updateDoc)  
+            res.send(result);
+        })
         app.patch('/tasksIncrement', async (req, res) => {
             const info = req.body;
             const coin = info.totalPayableCoin
