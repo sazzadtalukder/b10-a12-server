@@ -109,10 +109,10 @@ async function run() {
             const deleteResult = await userCollection.updateOne(query, updatedDoc)
             res.send({ paymentResult, deleteResult })
         })
-        app.get('/purchaseInfo', async (req,res)=>{
+        app.get('/purchaseInfo', async (req, res) => {
             const email = req.query.email;
-            const filter = {email : email}
-            const result = await  paymentCollection.find(filter).toArray();
+            const filter = { email: email }
+            const result = await paymentCollection.find(filter).toArray();
             res.send(result)
             // console.log(result)
         })
@@ -135,8 +135,8 @@ async function run() {
             }
             res.send({ admin })
         })
-        
-      
+
+
         // for buyer 
         app.get('/user/buyer/:email', async (req, res) => {
             const email = req.params.email;
@@ -153,20 +153,20 @@ async function run() {
         })
         // ----
         // for worker 
-        app.get('/user/worker/:email', 
-             async (req, res) => {
-            const email = req.params.email;
-            if (email != req.decoded.email) {
-                res.status(403).send({ message: "Forbidden Access" })
-            }
-            const query = { email: email }
-            const user = await userCollection.findOne(query);
-            let worker = false;
-            if (user) {
-                worker = user?.role == 'worker'
-            }
-            res.send({ worker })
-        })
+        app.get('/user/worker/:email',
+            async (req, res) => {
+                const email = req.params.email;
+                if (email != req.decoded.email) {
+                    res.status(403).send({ message: "Forbidden Access" })
+                }
+                const query = { email: email }
+                const user = await userCollection.findOne(query);
+                let worker = false;
+                if (user) {
+                    worker = user?.role == 'worker'
+                }
+                res.send({ worker })
+            })
         // ----
         app.post('/users', async (req, res) => {
 
@@ -179,46 +179,46 @@ async function run() {
             const result = await userCollection.insertOne(userInfo)
             res.send(result)
         })
-        app.get('/users',  async (req, res) => {
+        app.get('/users', async (req, res) => {
             // console.log(req.headers)
             const email = req.query.email;
             const filter = { email: email }
             const result = await userCollection.findOne(filter);
             res.send(result);
         })
-        app.get('/totalUser',async (req,res)=>{
-            
+        app.get('/totalUser', async (req, res) => {
+
             const result = await userCollection.find().toArray();
             res.send(result);
         })
-        app.get('/totalWorker',async (req,res)=>{
-            const filter = {role : 'worker'}
+        app.get('/totalWorker', async (req, res) => {
+            const filter = { role: 'worker' }
             const result = await userCollection.find(filter).toArray();
             res.send(result);
         })
-        app.get('/totalBuyer',async (req,res)=>{
-            const filter = {role : 'buyer'}
+        app.get('/totalBuyer', async (req, res) => {
+            const filter = { role: 'buyer' }
             const result = await userCollection.find(filter).toArray();
             res.send(result);
         })
-        app.get('/totalAmount',async (req,res)=>{
-            
+        app.get('/totalAmount', async (req, res) => {
+
             const result = await paymentCollection.find().toArray();
             res.send(result);
         })
-        app.get('/totalRequest',async (req,res)=>{
-            
+        app.get('/totalRequest', async (req, res) => {
+
             const result = await withRequestCollection.find().toArray();
             res.send(result);
         })
-        app.get('/totalRequest/:id',async (req,res)=>{
-            const id  = req.params.id;
-            const filter = {_id : new ObjectId(id)}
+        app.get('/totalRequest/:id', async (req, res) => {
+            const id = req.params.id;
+            const filter = { _id: new ObjectId(id) }
             const result = await withRequestCollection.findOne(filter)
             res.send(result);
         })
-        
-        app.patch('/updateApprove/:id',  async (req, res) => {
+
+        app.patch('/updateApprove/:id', async (req, res) => {
             const id = req.params.id;
             const query = { _id: new ObjectId(id) }
             const updateDoc = {
@@ -231,30 +231,30 @@ async function run() {
             res.send(result);
 
         })
-        app.patch('/decreaseCoin',  async (req, res) => {
+        app.patch('/decreaseCoin', async (req, res) => {
             const info = req.body
 
-            const query = { email : info?.worker_email }
+            const query = { email: info?.worker_email }
             const updateDoc = {
-                $inc : { coin : -info?. payable_amount }
+                $inc: { coin: -info?.payable_amount }
             }
             const result = await userCollection.updateOne(
                 query,
                 updateDoc
             )
-            console.log('update hoise worker ',result)
+            console.log('update hoise worker ', result)
             res.send(result);
 
         })
-        
-        app.delete('/totalUser/:id',  async (req, res) => {
+
+        app.delete('/totalUser/:id', async (req, res) => {
             const id = req.params.id;
             const filter = { _id: new ObjectId(id) }
             const result = await userCollection.deleteOne(filter)
-            console.log('delete er result',result)
+            console.log('delete er result', result)
             res.send(result)
         })
-        app.patch('/updateRole/:id',  async (req, res) => {
+        app.patch('/updateRole/:id', async (req, res) => {
             const info = req.body
             const id = req.params.id;
             const query = { _id: new ObjectId(id) }
@@ -268,10 +268,12 @@ async function run() {
             res.send(result);
 
         })
-        
+
         // //    task related api 
-        app.get('/submittedTask',  async (req, res) => {
+        app.get('/submittedTask', async (req, res) => {
             const email = req.query.email;
+            const page = parseInt(req.query.page) - 1;
+            const size = parseInt(req.query.size);
 
             const filter = {
                 Buyer_email: email,
@@ -281,66 +283,74 @@ async function run() {
             res.send(result)
 
         })
-        app.get('/submittedTask/:id',  async (req, res) => {
+       
+       
+
+        // app.get('/mySubmission', async (req, res) => {
+        //     const count = await productCollection.estimatedDocumentCount();
+        //     res.send({ count })
+        // })
+
+        app.get('/submittedTask/:id', async (req, res) => {
             const id = req.params.id;
             const filter = { _id: new ObjectId(id) }
             const result = await submittedTaskCollection.findOne(filter)
             res.send(result)
         })
-        app.patch('/submittedTask/:id', 
-             async (req, res) => {
-            const statusType = req.body;
-            console.log(statusType)
-            const status = statusType.status
-            const id = req.params.id;
-            const query = { _id: new ObjectId(id) }
-            const updateDoc = {
-                $set: { status: status }
-            }
-            const result = await submittedTaskCollection.updateOne(
-                query,
-                updateDoc
-            )
-            res.send(result);
+        app.patch('/submittedTask/:id',
+            async (req, res) => {
+                const statusType = req.body;
+                console.log(statusType)
+                const status = statusType.status
+                const id = req.params.id;
+                const query = { _id: new ObjectId(id) }
+                const updateDoc = {
+                    $set: { status: status }
+                }
+                const result = await submittedTaskCollection.updateOne(
+                    query,
+                    updateDoc
+                )
+                res.send(result);
 
-        })
+            })
 
-        
+
         app.patch('/updateWorker/:id', async (req, res) => {
             const id = req.params.id;
             const query = { _id: new ObjectId(id) }
             const updateDoc = {
-                $inc : { required_workers : +1 }
+                $inc: { required_workers: +1 }
             }
             const result = await taskCollection.updateOne(
                 query,
                 updateDoc
             )
-            console.log('update hoise worker ',result)
+            console.log('update hoise worker ', result)
             res.send(result);
 
         })
-        
-// worker_email --> submitted db
-// email --> users db
+
+        // worker_email --> submitted db
+        // email --> users db
 
 
         app.patch('/updateCoin', async (req, res) => {
             const info = req.body
 
-            const query = { email : info?.worker_email }
+            const query = { email: info?.worker_email }
             const updateDoc = {
-                $inc : { coin : +info?. payable_amount }
+                $inc: { coin: +info?.payable_amount }
             }
             const result = await userCollection.updateOne(
                 query,
                 updateDoc
             )
-            console.log('update hoise worker ',result)
+            console.log('update hoise worker ', result)
             res.send(result);
 
         })
-        app.patch('/updateStatus/:id',  async (req, res) => {
+        app.patch('/updateStatus/:id', async (req, res) => {
             const id = req.params.id;
             const query = { _id: new ObjectId(id) }
             const updateDoc = {
@@ -358,7 +368,7 @@ async function run() {
             const result = await taskCollection.insertOne(taskInfo)
             res.send(result)
         })
-        app.patch('/tasks',  async (req, res) => {
+        app.patch('/tasks', async (req, res) => {
             const coinAmount = req.body;
             console.log(coinAmount)
             const coin = coinAmount.totalPayableAmount
@@ -376,16 +386,16 @@ async function run() {
             res.send(result);
 
         })
-       
-        app.patch('/taskUpdate/:id',  async (req, res) => {
+
+        app.patch('/taskUpdate/:id', async (req, res) => {
             const taskItem = req.body;
             const id = req.params.id;
             console.log(id)
-            const query = {_id : new ObjectId(id)}
+            const query = { _id: new ObjectId(id) }
             const updateDoc = {
-                $set: { task_title: taskItem?.task_title , task_detail: taskItem?.task_detail,submission_info: taskItem?.submission_info}
+                $set: { task_title: taskItem?.task_title, task_detail: taskItem?.task_detail, submission_info: taskItem?.submission_info }
             }
-            const result = await taskCollection.updateOne(query,updateDoc)  
+            const result = await taskCollection.updateOne(query, updateDoc)
             res.send(result);
         })
         app.patch('/tasksIncrement', async (req, res) => {
@@ -401,13 +411,13 @@ async function run() {
             res.send(result)
 
         })
-        app.get('/tasks/:id',  async (req, res) => {
+        app.get('/tasks/:id', async (req, res) => {
             const id = req.params.id;
             const filter = { _id: new ObjectId(id) };
             const singleTaskInfo = await taskCollection.findOne(filter);
             res.send(singleTaskInfo)
         })
-        app.get('/tasks',  async (req, res) => {
+        app.get('/tasks', async (req, res) => {
             const email = req.query.email;
             let query = {}
             if (email)
@@ -415,19 +425,19 @@ async function run() {
             const result = await taskCollection.find(query).toArray()
             res.send(result);
         })
-        app.delete('/tasks/:id',  async (req, res) => {
+        app.delete('/tasks/:id', async (req, res) => {
             const id = req.params.id;
             const filter = { _id: new ObjectId(id) }
             const result = await taskCollection.deleteOne(filter)
             res.send(result)
         })
-        app.get('/totalTask',  async (req, res) => {
-           
+        app.get('/totalTask', async (req, res) => {
+
             const result = await taskCollection.find().toArray()
             res.send(result)
         })
         // for worker api 
-        app.get('/tasksGreater',  async (req, res) => {
+        app.get('/tasksGreater', async (req, res) => {
 
             let query = { required_workers: { $gt: 0 } }
             const result = await taskCollection.find(query).toArray()
@@ -435,7 +445,7 @@ async function run() {
             // console.log(result)
             res.send(result);
         })
-        app.get('/taskDetails/:id',  async (req, res) => {
+        app.get('/taskDetails/:id', async (req, res) => {
             const id = req.params.id;
             const query = { _id: new ObjectId(id) }
             const result = await taskCollection.findOne(query)
@@ -448,24 +458,36 @@ async function run() {
             const result = await submittedTaskCollection.insertOne(submittedInfo)
             res.send(result)
         })
-        app.get('/submittedInfo',  async (req, res) => {
+         // pagination 
+        app.get('/submittedInfo', async (req, res) => {
             const email = req.query.email;
-
+            const page = parseInt(req.query.page) - 1;
+            const size = parseInt(req.query.size);
+            console.log('pagination query', page, size);
             const query = { worker_email: email }
-            const result = await submittedTaskCollection.find(query).toArray()
+            // const total = await submittedTaskCollection.countDocuments(query);
+            const result = await submittedTaskCollection.find(query).skip(page * size).limit(size).toArray()
             res.send(result);
         })
-        app.get('/pendingInfo',  async (req, res) => {
+        app.get('/taskCount', async (req,res)=>{
+            const email = req.query.email;
+            const filter = {worker_email : email}
+            
+            const result  = await  submittedTaskCollection.find(filter).toArray();
+            res.send(result)
+          })
+      
+        app.get('/pendingInfo', async (req, res) => {
             const email = req.query.email;
 
-            const query = { worker_email: email , status: 'pending'}
+            const query = { worker_email: email, status: 'pending' }
             const result = await submittedTaskCollection.find(query).toArray()
             res.send(result);
         })
         app.get('/approveInfo', async (req, res) => {
             const email = req.query.email;
 
-            const query = { worker_email: email , status: 'approve'}
+            const query = { worker_email: email, status: 'approve' }
             const result = await submittedTaskCollection.find(query).toArray()
             res.send(result);
         })
